@@ -157,11 +157,12 @@ ifeq ($(TARGET_USES_QCOM_BSP), true)
     LOCAL_C_INCLUDES += $(BOARD_DISPLAY_HAL)/libgralloc
     LOCAL_C_INCLUDES += $(BOARD_DISPLAY_HAL)/libqdutils
   else
-    LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/qcom/display
-  endif
+    LOCAL_C_INCLUDES += $(call project-path-for,qcom-display)/libgralloc
+    LOCAL_C_INCLUDES += $(call project-path-for,qcom-display)/libqdutils
     LOCAL_SHARED_LIBRARIES += libqdutils
     LOCAL_SHARED_LIBRARIES += libqdMetaData
     LOCAL_CFLAGS += -DQTI_BSP
+  endif
 endif
 
 LOCAL_MODULE := libsurfaceflinger
