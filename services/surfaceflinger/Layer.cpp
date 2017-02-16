@@ -1070,6 +1070,11 @@ void Layer::drawWithOpenGL(const sp<const DisplayDevice>& hw,
 
         win = s.active.transform.transform(win);
         win.intersect(hw->getViewport(), &win);
+        if (!s.finalCrop.isEmpty()) {
+            if (!win.intersect(s.finalCrop, &win)) {
+                 win.clear();
+            }
+        }
         win = s.active.transform.inverse().transform(win);
         win.intersect(Rect(s.active.w, s.active.h), &win);
         win = reduce(win, s.activeTransparentRegion);
@@ -1303,6 +1308,11 @@ void Layer::computeGeometry(const sp<const DisplayDevice>& hw, Mesh& mesh,
     if((hw_w * hw_h) > NUM_PIXEL_LOW_RES_PANEL) {
         win = s.active.transform.transform(win);
         win.intersect(hw->getViewport(), &win);
+        if (!s.finalCrop.isEmpty()) {
+            if (!win.intersect(s.finalCrop, &win)) {
+                 win.clear();
+            }
+        }
         win = s.active.transform.inverse().transform(win);
         win.intersect(Rect(s.active.w, s.active.h), &win);
         win = reduce(win, s.activeTransparentRegion);
