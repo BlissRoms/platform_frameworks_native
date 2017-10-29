@@ -169,11 +169,13 @@ status_t FramebufferSurface::nextBuffer(sp<GraphicBuffer>& outBuffer, sp<Fence>&
     mCurrentFence = item.mFence;
 
     outFence = item.mFence;
+    status_t result = 0;
+
 #ifdef USE_HWC2
     mHwcBufferCache.getHwcBuffer(mCurrentBufferSlot, mCurrentBuffer,
             &outSlot, &outBuffer);
     outDataspace = item.mDataSpace;
-    status_t result =
+    result =
             mHwc.setClientTarget(mDisplayType, outSlot, outFence, outBuffer, outDataspace);
     if (result != NO_ERROR) {
         ALOGE("error posting framebuffer: %d", result);
