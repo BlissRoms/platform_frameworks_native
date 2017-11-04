@@ -38,6 +38,7 @@ cc_library_shared {
 
     cflags: [
         "-Wno-unused-parameter",
+        "-O3",
         // TODO: Move inputflinger to its own process and mark it hidden
         //-fvisibility=hidden
     ],
