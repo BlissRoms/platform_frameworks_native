@@ -5068,8 +5068,7 @@ void SurfaceFlinger::renderScreenImplLocked(const RenderArea& renderArea,
     if (sourceCrop.width() == 0 || sourceCrop.height() == 0 || !sourceCrop.isValid()) {
         sourceCrop.setLeftTop(Point(0, 0));
         sourceCrop.setRightBottom(Point(raWidth, raHeight));
-    } else if (mPrimaryDisplayOrientation != DisplayState::eOrientationDefault &&
-               renderArea.getCaptureFill() != RenderArea::CaptureFill::CLEAR) {
+    } else if (mPrimaryDisplayOrientation != DisplayState::eOrientationDefault) {
         Transform tr;
         uint32_t flags = 0x00;
         switch (mPrimaryDisplayOrientation) {
@@ -5109,8 +5108,7 @@ void SurfaceFlinger::renderScreenImplLocked(const RenderArea& renderArea,
     engine.checkErrors();
 
     Transform::orientation_flags rotation = renderArea.getRotationFlags();
-    if (mPrimaryDisplayOrientation != DisplayState::eOrientationDefault &&
-        renderArea.getCaptureFill() != RenderArea::CaptureFill::CLEAR) {
+    if (mPrimaryDisplayOrientation != DisplayState::eOrientationDefault) {
         // convert hw orientation into flag presentation
         // here inverse transform needed
         uint8_t hw_rot_90  = 0x00;
