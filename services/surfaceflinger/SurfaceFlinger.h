@@ -286,6 +286,8 @@ public:
     // want to support color management to disable color management.
     static bool hasWideColorDisplay;
 
+    static int primaryDisplayOrientation;
+
     static char const* getServiceName() ANDROID_API {
         return "SurfaceFlinger";
     }
@@ -344,8 +346,6 @@ public:
 
     bool authenticateSurfaceTextureLocked(
         const sp<IGraphicBufferProducer>& bufferProducer) const;
-
-    int getPrimaryDisplayOrientation() const { return mPrimaryDisplayOrientation; }
 
 private:
     friend class Client;
@@ -538,6 +538,10 @@ private:
             sp<Layer>* outLayer);
 
     status_t createColorLayer(const sp<Client>& client, const String8& name,
+            uint32_t w, uint32_t h, uint32_t flags, sp<IBinder>* outHandle,
+            sp<Layer>* outLayer);
+
+    status_t createContainerLayer(const sp<Client>& client, const String8& name,
             uint32_t w, uint32_t h, uint32_t flags, sp<IBinder>* outHandle,
             sp<Layer>* outLayer);
 
@@ -858,7 +862,6 @@ private:
     mutable std::unique_ptr<MessageQueue> mEventQueue{std::make_unique<impl::MessageQueue>()};
     FrameTracker mAnimFrameTracker;
     DispSync mPrimaryDispSync;
-    int mPrimaryDisplayOrientation = DisplayState::eOrientationDefault;
 
     // protected by mDestroyedLayerLock;
     mutable Mutex mDestroyedLayerLock;
