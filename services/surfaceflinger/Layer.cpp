@@ -88,7 +88,6 @@ Layer::Layer(SurfaceFlinger* flinger, const sp<Client>& client, const String8& n
         mCurrentOpacity(true),
         mCurrentFrameNumber(0),
         mFrameLatencyNeeded(false),
-        mFiltering(false),
         mNeedsFiltering(false),
         mProtectedByApp(false),
         mClientRef(client),
@@ -133,22 +132,7 @@ Layer::Layer(SurfaceFlinger* flinger, const sp<Client>& client, const String8& n
     CompositorTiming compositorTiming;
     flinger->getCompositorTiming(&compositorTiming);
     mFrameEventHistory.initializeCompositorTiming(compositorTiming);
-}
-
-void Layer::onFirstRef() NO_THREAD_SAFETY_ANALYSIS {
-    if (!isCreatedFromMainThread()) {
-        // Grab the SF state lock during this since it's the only way to safely access HWC
-        mFlinger->mStateLock.lock();
-    }
-
-    const auto& hwc = mFlinger->getHwComposer();
-    const auto& activeConfig = hwc.getActiveConfig(HWC_DISPLAY_PRIMARY);
-    nsecs_t displayPeriod = activeConfig->getVsyncPeriod();
-    mFrameTracker.setDisplayRefreshPeriod(displayPeriod);
-
-    if (!isCreatedFromMainThread()) {
-        mFlinger->mStateLock.unlock();
-    }
+    mFrameTracker.setDisplayRefreshPeriod(compositorTiming.interval);
 }
 
 Layer::~Layer() {
@@ -803,14 +787,6 @@ bool Layer::addSyncPoint(const std::shared_ptr<SyncPoint>& point) {
     Mutex::Autolock lock(mLocalSyncPointMutex);
     mLocalSyncPoints.push_back(point);
     return true;
-}
-
-void Layer::setFiltering(bool filtering) {
-    mFiltering = filtering;
-}
-
-bool Layer::getFiltering() const {
-    return mFiltering;
 }
 
 // ----------------------------------------------------------------------------

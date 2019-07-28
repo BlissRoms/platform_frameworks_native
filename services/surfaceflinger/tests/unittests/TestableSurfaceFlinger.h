@@ -110,7 +110,7 @@ public:
      */
 
     auto& mutableHasWideColorDisplay() { return SurfaceFlinger::hasWideColorDisplay; }
-
+    auto& mutablePrimaryDisplayOrientation() { return SurfaceFlinger::primaryDisplayOrientation; }
     auto& mutableBuiltinDisplays() { return mFlinger->mBuiltinDisplays; }
     auto& mutableCurrentState() { return mFlinger->mCurrentState; }
     auto& mutableDisplays() { return mFlinger->mDisplays; }
@@ -217,13 +217,27 @@ public:
             return *this;
         }
 
-        auto& addCapability(HWC2::Capability cap) {
-            mCapabilities.emplace(cap);
+        auto& setCapabilities(const std::unordered_set<HWC2::Capability>* capabilities) {
+            mCapabilities = capabilities;
+            return *this;
+        }
+
+        auto& setPowerAdvisor(Hwc2::PowerAdvisor* powerAdvisor) {
+            mPowerAdvisor = powerAdvisor;
             return *this;
         }
 
         void inject(TestableSurfaceFlinger* flinger, Hwc2::Composer* composer) {
-            auto display = std::make_unique<HWC2Display>(*composer, mPowerAdvisor, mCapabilities,
+            static FakePowerAdvisor defaultPowerAdvisor;
+            if (mPowerAdvisor == nullptr) mPowerAdvisor = &defaultPowerAdvisor;
+            static const std::unordered_set<HWC2::Capability> defaultCapabilities;
+            if (mCapabilities == nullptr) mCapabilities = &defaultCapabilities;
+
+            // Caution - Make sure that any values passed by reference here do
+            // not refer to an instance owned by FakeHwcDisplayInjector. This
+            // class has temporary lifetime, while the constructed HWC2::Display
+            // is much longer lived.
+            auto display = std::make_unique<HWC2Display>(*composer, *mPowerAdvisor, *mCapabilities,
                                                          mHwcDisplayId, mHwcDisplayType);
 
             auto config = HWC2::Display::Config::Builder(*display, mActiveConfig);
@@ -253,8 +267,8 @@ public:
         int32_t mDpiX = DEFAULT_DPI;
         int32_t mDpiY = DEFAULT_DPI;
         int32_t mActiveConfig = DEFAULT_ACTIVE_CONFIG;
-        std::unordered_set<HWC2::Capability> mCapabilities;
-        FakePowerAdvisor mPowerAdvisor;
+        const std::unordered_set<HWC2::Capability>* mCapabilities = nullptr;
+        Hwc2::PowerAdvisor* mPowerAdvisor = nullptr;
     };
 
     class FakeDisplayDeviceInjector {
@@ -306,10 +320,11 @@ public:
         sp<DisplayDevice> inject() {
             std::unordered_map<ui::ColorMode, std::vector<ui::RenderIntent>> hdrAndRenderIntents;
             sp<DisplayDevice> device =
-                    new DisplayDevice(mFlinger.mFlinger.get(), mType, mHwcId, mSecure, mDisplayToken,
-                                      mNativeWindow, mDisplaySurface, std::move(mRenderSurface), 0,
-                                      0, false, HdrCapabilities(), 0, hdrAndRenderIntents,
-                                      HWC_POWER_MODE_NORMAL);
+                    new DisplayDevice(mFlinger.mFlinger.get(), mType, mHwcId, mSecure,
+                                      mDisplayToken, mNativeWindow, mDisplaySurface,
+                                      std::move(mRenderSurface), 0, 0,
+                                      DisplayState::eOrientationDefault, false, HdrCapabilities(),
+                                      0, hdrAndRenderIntents, HWC_POWER_MODE_NORMAL);
             mFlinger.mutableDisplays().add(mDisplayToken, device);
 
             DisplayDeviceState state(mType, mSecure);
