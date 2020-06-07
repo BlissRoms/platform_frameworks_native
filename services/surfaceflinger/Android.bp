@@ -73,7 +73,7 @@ cc_defaults {
         "android.hardware.graphics.composer@2.3-command-buffer",
     ],
     product_variables: {
-        lineage: {
+        bliss: {
             qcom_um_soong_namespace: {
                 cflags: ["-DQCOM_UM_FAMILY"],
                 header_libs: ["//%s:display_intf_headers"],

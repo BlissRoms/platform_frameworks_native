@@ -50,7 +50,7 @@ cc_library_shared {
     ],
 
     product_variables: {
-        lineage: {
+        bliss: {
             additional_gralloc_10_usage_bits: {
                 cppflags: ["-DADDNL_GRALLOC_10_USAGE_BITS=%s"],
             },
