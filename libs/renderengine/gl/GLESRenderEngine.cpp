@@ -1102,6 +1102,7 @@ status_t GLESRenderEngine::drawLayers(const DisplaySettings& display,
 
     setOutputDataSpace(display.outputDataspace);
     setDisplayMaxLuminance(display.maxLuminance);
+    setDisplayColorTransform(display.colorTransform);
 
     const mat4 projectionMatrix =
             ui::Transform(display.orientation).asMatrix4() * mState.projectionMatrix;
@@ -1171,7 +1172,7 @@ status_t GLESRenderEngine::drawLayers(const DisplaySettings& display,
         position[3] = vec2(bounds.right, bounds.top);
 
         setupLayerCropping(*layer, mesh);
-        setColorTransform(display.colorTransform * layer->colorTransform);
+        setColorTransform(layer->colorTransform);
 
         bool usePremultipliedAlpha = true;
         bool disableTexture = true;
@@ -1325,6 +1326,10 @@ void GLESRenderEngine::setupLayerTexturing(const Texture& texture) {
 
 void GLESRenderEngine::setColorTransform(const mat4& colorTransform) {
     mState.colorMatrix = colorTransform;
+}
+
+void GLESRenderEngine::setDisplayColorTransform(const mat4& colorTransform) {
+    mState.displayColorMatrix = colorTransform;
 }
 
 void GLESRenderEngine::disableTexturing() {
