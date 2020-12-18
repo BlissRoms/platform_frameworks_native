@@ -1494,40 +1494,13 @@ int32_t InputDispatcher::findFocusedWindowTargetsLocked(nsecs_t currentTime,
 
     // If there is no currently focused window and no focused application
     // then drop the event.
-    if (focusedWindowHandle == nullptr && focusedApplicationHandle == nullptr) {
+    if (focusedWindowHandle == nullptr) {
+        if (focusedApplicationHandle != nullptr) {
         ALOGI("Dropping %s event because there is no focused window or focused application in "
               "display %" PRId32 ".",
               EventEntry::typeToString(entry.type), displayId);
+            }
         return INPUT_EVENT_INJECTION_FAILED;
-    }
-
-    // Compatibility behavior: raise ANR if there is a focused application, but no focused window.
-    // Only start counting when we have a focused event to dispatch. The ANR is canceled if we
-    // start interacting with another application via touch (app switch). This code can be removed
-    // if the "no focused window ANR" is moved to the policy. Input doesn't know whether
-    // an app is expected to have a focused window.
-    if (focusedWindowHandle == nullptr && focusedApplicationHandle != nullptr) {
-        if (!mNoFocusedWindowTimeoutTime.has_value()) {
-            // We just discovered that there's no focused window. Start the ANR timer
-            const nsecs_t timeout = focusedApplicationHandle->getDispatchingTimeout(
-                    DEFAULT_INPUT_DISPATCHING_TIMEOUT.count());
-            mNoFocusedWindowTimeoutTime = currentTime + timeout;
-            mAwaitedFocusedApplication = focusedApplicationHandle;
-            mAwaitedApplicationDisplayId = displayId;
-            ALOGW("Waiting because no window has focus but %s may eventually add a "
-                  "window when it finishes starting up. Will wait for %" PRId64 "ms",
-                  mAwaitedFocusedApplication->getName().c_str(), ns2ms(timeout));
-            *nextWakeupTime = *mNoFocusedWindowTimeoutTime;
-            return INPUT_EVENT_INJECTION_PENDING;
-        } else if (currentTime > *mNoFocusedWindowTimeoutTime) {
-            // Already raised ANR. Drop the event
-            ALOGE("Dropping %s event because there is no focused window",
-                  EventEntry::typeToString(entry.type));
-            return INPUT_EVENT_INJECTION_FAILED;
-        } else {
-            // Still waiting for the focused window
-            return INPUT_EVENT_INJECTION_PENDING;
-        }
     }
 
     // we have a valid, non-null focused window
