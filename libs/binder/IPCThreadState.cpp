@@ -628,6 +628,7 @@ int IPCThreadState::setupPolling(int* fd)
     }
 
     mOut.writeInt32(BC_ENTER_LOOPER);
+    flushCommands();
     *fd = mProcess->mDriverFD;
     return 0;
 }
