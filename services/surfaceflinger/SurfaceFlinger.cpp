@@ -546,6 +546,10 @@ SurfaceFlinger::SurfaceFlinger(Factory& factory) : SurfaceFlinger(factory, SkipI
 
     mDebugFlashDelay = base::GetUintProperty("debug.sf.showupdates"s, 0u);
 
+    property_get("debug.sf.disable_backpressure", value, "0");
+    mPropagateBackpressure = !atoi(value);
+    ALOGI_IF(!mPropagateBackpressure, "Disabling backpressure propagation");
+
     mBackpressureGpuComposition = base::GetBoolProperty("debug.sf.enable_gl_backpressure"s, true);
     ALOGI_IF(mBackpressureGpuComposition, "Enabling backpressure for GPU composition");
 
@@ -3067,7 +3071,7 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
     }
 
     if (pacesetterFrameTargetPtr->wouldBackpressureHwc()) {
-        if (mBackpressureGpuComposition || pacesetterFrameTargetPtr->didMissHwcFrame()) {
+        if (mPropagateBackpressure && (mBackpressureGpuComposition || pacesetterFrameTargetPtr->didMissHwcFrame())) {
             mScheduler->getVsyncSchedule()->getTracker().onFrameMissed(
                     pacesetterFrameTargetPtr->expectedPresentTime());
             const Duration slack = TimePoint::now() - pacesetterFrameTargetPtr->frameBeginTime();
@@ -5234,6 +5238,9 @@ void SurfaceFlinger::initScheduler(const sp<const DisplayDevice>& display) {
     }
     if (mBackpressureGpuComposition) {
         features |= Feature::kBackpressureGpuComposition;
+    }
+    if (mPropagateBackpressure) {
+        features |= Feature::kPropagateBackpressure;
     }
     if (getHwComposer().getComposer()->isSupported(
                 Hwc2::Composer::OptionalFeature::ExpectedPresentTime)) {
