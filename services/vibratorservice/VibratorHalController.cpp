@@ -53,7 +53,16 @@ std::shared_ptr<HalWrapper> connectHal(std::shared_ptr<CallbackScheduler> schedu
         return nullptr;
     }
 
-    sp<Aidl::IVibrator> aidlHal = waitForVintfService<Aidl::IVibrator>();
+    char propStr[PROP_VALUE_MAX] = {0};
+    sp<Aidl::IVibrator> aidlHal = nullptr;
+    property_get("sys.haptic.motor", propStr, "");
+    if (!strcmp(propStr, "linear") || !strcmp(propStr, "zlinear")){
+        aidlHal = waitForVintfService<Aidl::IVibrator>(String16("vibratorfeature"));
+        ALOGE("Connected to Vibrator HAL AIDL service : vibratorfeature");
+    } else{
+        aidlHal = waitForVintfService<Aidl::IVibrator>();
+        ALOGE("Connected to Vibrator HAL AIDL service : IVibrator");
+    }
     if (aidlHal) {
         ALOGV("Successfully connected to Vibrator HAL AIDL service.");
         return std::make_shared<AidlHalWrapper>(std::move(scheduler), aidlHal);
