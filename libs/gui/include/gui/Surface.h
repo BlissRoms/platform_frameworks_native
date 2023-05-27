@@ -523,6 +523,8 @@ public:
                         bool reportBufferRemoval = false, bool needsAcquiredNotify = false,
                         bool needsDroppedNotify = false);
     virtual int detachNextBuffer(sp<GraphicBuffer>* outBuffer, sp<Fence>* outFence);
+    // MIUI ADD
+    virtual void releaseSlot(int slot);
     virtual int attachBuffer(ANativeWindowBuffer*);
     virtual int attachBuffer(const sp<GraphicBuffer>& buffer);
 
