@@ -53,6 +53,11 @@
 
 #include <com_android_graphics_libgui_flags.h>
 
+#include <string>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <android-base/properties.h>
+
 namespace android {
 
 using namespace com::android::graphics::libgui;
@@ -73,6 +78,178 @@ bool isInterceptorRegistrationOp(int op) {
             op == NATIVE_WINDOW_SET_PERFORM_INTERCEPTOR ||
             op == NATIVE_WINDOW_SET_QUEUE_INTERCEPTOR ||
             op == NATIVE_WINDOW_SET_QUERY_INTERCEPTOR;
+}
+
+} // namespace
+
+namespace {
+
+typedef struct _FEAS_BUFFER_PACKAGE {
+    __u32 pid;
+    union {
+        __u32 start;
+        __u32 connectedAPI;
+    };
+    union {
+        __u64 frame_time;
+        __u64 bufID;
+    };
+    __u64 frame_id; 
+    __s32 queue_SF;
+    __u64 identifier;
+} FEAS_BUFFER_PACKAGE;
+
+#define FEAS_QUEUE_BEG    _IOW('g', 1, FEAS_BUFFER_PACKAGE)
+#define FEAS_CONNECT      _IOW('g', 15, FEAS_BUFFER_PACKAGE)
+
+#define ALOGTI(TAG_NAME, ...) do{((void)ALOG(LOG_INFO, TAG_NAME, __VA_ARGS__));}while(0)
+#define ALOGTD(TAG_NAME, ...) do{((void)ALOG(LOG_DEBUG, TAG_NAME, __VA_ARGS__));}while(0)
+
+#define FEAS_IOCTL_PATH   "/proc/perfmgr/perf_ioctl"
+
+static Mutex mFEASMutex;
+
+int mFEASDevFd = -1;
+inline static bool checkFEASDev() {
+    if (mFEASDevFd >= 0) {
+        return true;
+    } else if (mFEASDevFd == -1) {
+        mFEASDevFd = open(FEAS_IOCTL_PATH, O_RDONLY);
+        if (mFEASDevFd >= 0)
+            return true;
+        if (mFEASDevFd < 0) {
+            mFEASDevFd = -2;
+            ALOGTD("FEAS", "Can't open %s: %s", FEAS_IOCTL_PATH, strerror(errno));
+            return false;
+        }
+    }
+    return false;
+}
+
+static inline void getProcessNameByPid(int pid, std::string &processName) {
+    char buf[64] = {0};
+    const char *statusPath = "/proc/%d/status";
+    snprintf(buf, 64, statusPath, pid);
+    FILE *file = fopen(buf, "r");
+    if (file) {
+        while (fgets(buf, 64, file) != nullptr) {
+            if (strncmp(buf, "Name:", 5) == 0) {
+                sscanf(buf, "%*s%s", buf);
+                processName.assign(buf);
+                break;
+            }
+        }
+        fclose(file);
+    }
+}
+
+inline static void getProcessNameByPid2(int pid, std::string &processName) {
+    char buf[64] = {0};
+    int cnt = 0;
+    const char *statusPath = "/proc/%d/cmdline";
+    snprintf(buf, 64, statusPath, pid);
+    FILE *file = fopen(buf, "r");
+    if (file) {
+        if (fgets(buf, sizeof(buf), file)) {
+            cnt = (int) strlen(buf);
+            while (cnt >= 0 && buf[cnt] != '/') cnt--;
+            cnt++;
+            processName.assign(&buf[cnt]);
+	}
+	fclose(file);
+    }
+}
+
+bool mFEASInitialized = false;
+bool mFEASEnable = false;
+static bool checkFEASEnable() {
+    if (mFEASInitialized) return mFEASEnable;
+    pid_t pid = getpid();
+    mFEASEnable = android::base::GetBoolProperty("ro.feas.enable", false);
+    if (mFEASEnable) {
+        std::string processName;
+        getProcessNameByPid2(pid, processName);
+        const char *processNameCStr = processName.c_str();
+        if (strncmp(processNameCStr, "surfaceflinger", 14) == 0 ||
+                strncmp(processNameCStr, "com.android.systemui", 20) == 0 ||
+                strncmp(processNameCStr, "com.tencent.mobileqq", 20) == 0 ||
+                strncmp(processNameCStr, "com.tencent.mm", 14) == 0 ||
+                strncmp(processNameCStr, "com.tencent.qqmusic", 19) == 0 ||
+                strncmp(processNameCStr, "com.taobao.", 11) == 0 ||
+                strncmp(processNameCStr, "com.eg.android.AlipayGphone", 27) == 0 ||
+                strncmp(processNameCStr, "com.jingdong", 12) == 0 ||
+                strncmp(processNameCStr, "com.jd.", 7) == 0 ||
+                strncmp(processNameCStr, "tv.danmaku.bili", 15) == 0 ||
+                strncmp(processNameCStr, "com.bilibili.app.in", 19) == 0 ||
+                strncmp(processNameCStr, "org.telegram.messenger", 22) == 0 ||
+                strncmp(processNameCStr, "com.baidu.", 10) == 0 ||
+                strncmp(processNameCStr, "com.autonavi.minimap", 20) == 0 ||
+                strncmp(processNameCStr, "com.coolapk.market", 18) == 0 ||
+                strstr(processNameCStr, "magisk") != nullptr)
+            mFEASEnable = false;
+    }
+    std::string processName;
+    getProcessNameByPid(pid, processName);
+    ALOGTI(processName.c_str(), "Support FEAS: %s", mFEASEnable ? "true" : "false");
+    mFEASInitialized = true;
+    return mFEASEnable;
+}
+
+inline static void feasConnect(const int32_t& api, const uint64_t& identifier) {
+    FEAS_BUFFER_PACKAGE msg;
+    Mutex::Autolock lock(mFEASMutex);
+    msg.pid = getpid();
+    msg.connectedAPI = api;
+    msg.identifier = identifier;
+    if (checkFEASDev()) ioctl(mFEASDevFd, FEAS_CONNECT, &msg);
+    /*
+    std::string processName;
+    getProcessNameByPid(getpid(), processName);
+    if (checkFEASDev()) {
+        int ret = ioctl(mFEASDevFd, FEAS_CONNECT, &msg);
+        ALOGTI(processName.c_str(), "FEAS conn ioctl: %d", ret);
+    } else {
+    	ALOGTD(processName.c_str(), "checkFEASDev: %s", "false");
+    }
+    */
+}
+
+inline static void feasQueueBEG(const uint64_t& identifier) {
+    FEAS_BUFFER_PACKAGE msg;
+    Mutex::Autolock lock(mFEASMutex);
+    msg.pid = getpid();
+    msg.start = 1;
+    msg.identifier = identifier;
+    if (checkFEASDev()) ioctl(mFEASDevFd, FEAS_QUEUE_BEG, &msg);
+    /*
+    std::string processName;
+    getProcessNameByPid(getpid(), processName);
+    if (checkFEASDev()) {
+        int ret = ioctl(mFEASDevFd, FEAS_QUEUE_BEG, &msg);
+        ALOGTI(processName.c_str(), "FEAS queue ioctl: %d", ret);
+     } else {
+    	ALOGTD(processName.c_str(), "checkFEASDev: %s", "false");
+    }
+    */
+}
+
+inline static void feasDisconnect(const uint64_t& identifier) {
+    FEAS_BUFFER_PACKAGE msg;
+    Mutex::Autolock lock(mFEASMutex);
+    msg.pid = getpid();
+    msg.identifier = identifier;
+    msg.connectedAPI = 0;
+    if (checkFEASDev()) ioctl(mFEASDevFd, FEAS_CONNECT, &msg);
+    /*
+    std::string processName;
+    getProcessNameByPid(getpid(), processName);
+    if (checkFEASDev()) {
+        int ret = ioctl(mFEASDevFd, FEAS_CONNECT, &msg);
+        ALOGTI(processName.c_str(), "FEAS disconn ioctl: %d", ret);
+     } else {
+    	ALOGTD(processName.c_str(), "checkFEASDev: %s", "false");
+    }
+    */
 }
 
 } // namespace
@@ -1333,6 +1510,10 @@ int Surface::queueBuffer(android_native_buffer_t* buffer, int fenceFd) {
     ALOGV("Surface::queueBuffer");
     Mutex::Autolock lock(mMutex);
 
+    if (checkFEASEnable()) {
+        feasQueueBEG(static_cast<uint64_t>(reinterpret_cast<intptr_t>(this)));
+    }
+
     int i = getSlotFromBufferLocked(buffer);
     if (i < 0) {
         if (fenceFd >= 0) {
@@ -2120,6 +2301,10 @@ int Surface::connect(int api, const sp<SurfaceListener>& listener, bool reportBu
         mDirtyRegion = Region::INVALID_REGION;
     }
 
+    if (checkFEASEnable()) {
+        feasConnect(api, static_cast<uint64_t>(reinterpret_cast<intptr_t>(this)));
+    }
+
     return err;
 }
 
@@ -2158,6 +2343,9 @@ int Surface::disconnect(int api, IGraphicBufferProducer::DisconnectMode mode) {
     }
 #endif // COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_PLATFORM_API_IMPROVEMENTS)
 
+    if (checkFEASEnable()) {
+       feasDisconnect(static_cast<uint64_t>(reinterpret_cast<intptr_t>(this)));
+    }
     return err;
 }
 
