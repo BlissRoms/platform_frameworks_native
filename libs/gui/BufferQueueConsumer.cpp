@@ -322,45 +322,36 @@ status_t BufferQueueConsumer::detachBuffer(int slot) {
     ATRACE_CALL();
     ATRACE_BUFFER_INDEX(slot);
     BQ_LOGV("detachBuffer: slot %d", slot);
-    sp<IProducerListener> listener;
-    {
-        std::lock_guard<std::mutex> lock(mCore->mMutex);
+    std::lock_guard<std::mutex> lock(mCore->mMutex);
 
-        if (mCore->mIsAbandoned) {
-            BQ_LOGE("detachBuffer: BufferQueue has been abandoned");
-            return NO_INIT;
-        }
-
-        if (mCore->mSharedBufferMode || slot == mCore->mSharedBufferSlot) {
-            BQ_LOGE("detachBuffer: detachBuffer not allowed in shared buffer mode");
-            return BAD_VALUE;
-        }
-
-        const int totalSlotCount = mCore->getTotalSlotCountLocked();
-        if (slot < 0 || slot >= totalSlotCount) {
-            BQ_LOGE("detachBuffer: slot index %d out of range [0, %d)", slot, totalSlotCount);
-            return BAD_VALUE;
-        } else if (!mSlots[slot].mBufferState.isAcquired()) {
-            BQ_LOGE("detachBuffer: slot %d is not owned by the consumer "
-                    "(state = %s)", slot, mSlots[slot].mBufferState.string());
-            return BAD_VALUE;
-        }
-        if (mCore->mBufferReleasedCbEnabled) {
-            listener = mCore->mConnectedProducerListener;
-        }
-
-        mSlots[slot].mBufferState.detachConsumer();
-        mCore->mActiveBuffers.erase(slot);
-        mCore->mFreeSlots.insert(slot);
-        mCore->clearBufferSlotLocked(slot);
-        mCore->notifyBufferReleased();
-
-        VALIDATE_CONSISTENCY();
+    if (mCore->mIsAbandoned) {
+        BQ_LOGE("detachBuffer: BufferQueue has been abandoned");
+        return NO_INIT;
     }
 
-    if (listener) {
-        listener->onBufferDetached(slot);
+    if (mCore->mSharedBufferMode || slot == mCore->mSharedBufferSlot) {
+        BQ_LOGE("detachBuffer: detachBuffer not allowed in shared buffer mode");
+        return BAD_VALUE;
     }
+
+    const int totalSlotCount = mCore->getTotalSlotCountLocked();
+    if (slot < 0 || slot >= totalSlotCount) {
+        BQ_LOGE("detachBuffer: slot index %d out of range [0, %d)", slot, totalSlotCount);
+        return BAD_VALUE;
+    } else if (!mSlots[slot].mBufferState.isAcquired()) {
+        BQ_LOGE("detachBuffer: slot %d is not owned by the consumer "
+                "(state = %s)", slot, mSlots[slot].mBufferState.string());
+        return BAD_VALUE;
+    }
+
+    mSlots[slot].mBufferState.detachConsumer();
+    mCore->mActiveBuffers.erase(slot);
+    mCore->mFreeSlots.insert(slot);
+    mCore->clearBufferSlotLocked(slot);
+    mCore->notifyBufferReleased();
+
+    VALIDATE_CONSISTENCY();
+
     return NO_ERROR;
 }
 
