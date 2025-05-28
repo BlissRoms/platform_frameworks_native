@@ -97,6 +97,7 @@ public:
     virtual void onBuffersDiscarded(const std::vector<sp<GraphicBuffer>>& buffers) {
         mDiscardedBuffers.insert(mDiscardedBuffers.end(), buffers.begin(), buffers.end());
     }
+    virtual void onBufferDetached(int /*slot*/) {}
     int getReleaseNotifyCount() const {
         return mBuffersReleased;
     }
@@ -2334,6 +2335,7 @@ TEST_F(SurfaceTest, QueueAcquireReleaseDequeue_CalledInStack_DoesNotDeadlock) {
 
         virtual bool needsReleaseNotify() override { return true; }
         virtual void onBuffersDiscarded(const std::vector<sp<GraphicBuffer>>&) override {}
+        virtual void onBufferDetached(int) override {}
 
         sp<GraphicBuffer> mBuffer;
         sp<Fence> mFence;

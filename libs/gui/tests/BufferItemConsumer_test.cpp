@@ -51,6 +51,7 @@ class BufferItemConsumerTest : public ::testing::Test {
         virtual void onBufferReleased() override {}
         virtual bool needsReleaseNotify() override { return true; }
         virtual void onBuffersDiscarded(const std::vector<int32_t>&) override {}
+        virtual void onBufferDetached(int slot) override { mTest->HandleBufferDetached(slot); }
 
         BufferItemConsumerTest* mTest;
     };
