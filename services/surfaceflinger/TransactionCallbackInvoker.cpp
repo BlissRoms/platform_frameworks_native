@@ -218,6 +218,10 @@ void TransactionCallbackInvoker::sendCallbacks(bool onCommitOnly) {
         mPresentFence.clear();
     }
 
+    if (listenerStatsToSend.empty()) {
+        return;
+    }
+
     if (FlagManager::getInstance().fence_handling()) {
         // Use a shared_ptr as FenceMerger is not copyable, but std::function requires the lambda
         // to be copyable.
