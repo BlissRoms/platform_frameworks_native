@@ -55,9 +55,6 @@ bool H2BProducerListener::needsReleaseNotify() {
 void H2BProducerListener::onBuffersDiscarded(const std::vector<int32_t>& /*slots*/) {
 }
 
-void H2BProducerListener::onBufferDetached(int /*slot*/) {
-}
-
 }  // namespace utils
 }  // namespace V2_0
 }  // namespace bufferqueue
