@@ -773,6 +773,11 @@ void Output::ensureOutputLayerIfVisible(sp<compositionengine::LayerFE>& layerFE,
     // one, or create a new one if we do not.
     auto outputLayer = ensureOutputLayer(prevOutputLayerIndex, layerFE);
 
+    coverage.aboveBlurRequests += static_cast<int32_t>(layerFEState->backgroundBlurRadius > 0);
+    // Each blur region can contain a separate blur radius so we need to count each region
+    // as a separate request.
+    coverage.aboveBlurRequests += static_cast<int32_t>(layerFEState->blurRegions.size());
+
     // Store the layer coverage information into the layer state as some of it
     // is useful later.
     auto& outputLayerState = outputLayer->editState();
@@ -787,6 +792,11 @@ void Output::ensureOutputLayerIfVisible(sp<compositionengine::LayerFE>& layerFE,
             ? outputState.transform.transform(
                       transparentRegion.intersect(outputState.layerStackSpace.getContent()))
             : Region();
+
+    // See b/399120953: blurs are so expensive that they may be susceptible to compression side
+    // channel attacks
+    static constexpr auto kMaxBlurRequests = 10;
+    outputLayerState.ignoreBlur = coverage.aboveBlurRequests > kMaxBlurRequests;
     if (CC_UNLIKELY(computeAboveCoveredExcludingOverlays)) {
         outputLayerState.coveredRegionExcludingDisplayOverlays =
                 std::move(coveredRegionExcludingDisplayOverlays);
@@ -1506,7 +1516,7 @@ std::vector<LayerFE::LayerSettings> Output::generateClientCompositionRequests(
     const Region viewportRegion(outputState.layerStackSpace.getContent());
     bool firstLayer = true;
 
-    bool disableBlurs = false;
+    bool disableBlursWholesale = false;
     uint64_t previousOverrideBufferId = 0;
 
     for (auto* layer : getOutputLayersOrderedByZ()) {
@@ -1523,7 +1533,8 @@ std::vector<LayerFE::LayerSettings> Output::generateClientCompositionRequests(
             continue;
         }
 
-        disableBlurs |= layerFEState->sidebandStream != nullptr;
+        disableBlursWholesale |= layerFEState->sidebandStream != nullptr;
+        bool disableBlurForLayer = layer->getState().ignoreBlur || disableBlursWholesale;
 
         const bool clientComposition = layer->requiresClientComposition();
 
@@ -1553,7 +1564,8 @@ std::vector<LayerFE::LayerSettings> Output::generateClientCompositionRequests(
                           layer->getLayerFE().getDebugName());
                 }
             } else {
-                LayerFE::ClientCompositionTargetSettings::BlurSetting blurSetting = disableBlurs
+                LayerFE::ClientCompositionTargetSettings::BlurSetting blurSetting =
+                        disableBlurForLayer
                         ? LayerFE::ClientCompositionTargetSettings::BlurSetting::Disabled
                         : (layer->getState().overrideInfo.disableBackgroundBlur
                                    ? LayerFE::ClientCompositionTargetSettings::BlurSetting::
