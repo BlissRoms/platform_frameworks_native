@@ -25,8 +25,6 @@
 #include <hidl/HybridInterface.h>
 #include <utils/RefBase.h>
 
-#include <com_android_graphics_libgui_flags.h>
-
 namespace android {
 
 // ProducerListener is the interface through which the BufferQueue notifies the
@@ -51,22 +49,6 @@ public:
     // onBuffersFreed is called from IGraphicBufferConsumer::discardFreeBuffers
     // to notify the producer that certain free buffers are discarded by the consumer.
     virtual void onBuffersDiscarded(const std::vector<int32_t>& slots) = 0; // Asynchronous
-    // onBufferDetached is called from IGraphicBufferConsumer::detachBuffer to
-    // notify the producer that a buffer slot is free and ready to be dequeued.
-    //
-    // This is called without any lock held and can be called concurrently by
-    // multiple threads.
-    virtual void onBufferDetached(int /*slot*/) {} // Asynchronous
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_CONSUMER_ATTACH_CALLBACK)
-    // onBufferAttached is called from IGraphicBufferConsumer::attachBuffer to
-    // notify the producer that a buffer is attached.
-    //
-    // This is called without any lock held and can be called concurrently by
-    // multiple threads. This callback is enabled only when needsAttachNotify()
-    // returns {@code true}.
-    virtual void onBufferAttached() {} // Asynchronous
-    virtual bool needsAttachNotify() { return false; }
-#endif
 };
 
 #ifndef NO_BINDER
@@ -90,10 +72,6 @@ public:
             Parcel* reply, uint32_t flags = 0);
     virtual bool needsReleaseNotify();
     virtual void onBuffersDiscarded(const std::vector<int32_t>& slots);
-    virtual void onBufferDetached(int slot);
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_CONSUMER_ATTACH_CALLBACK)
-    virtual bool needsAttachNotify();
-#endif
 };
 
 #else
@@ -107,10 +85,6 @@ public:
     virtual ~StubProducerListener();
     virtual void onBufferReleased() {}
     virtual bool needsReleaseNotify() { return false; }
-    virtual void onBufferDetached(int /**slot**/) {}
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_CONSUMER_ATTACH_CALLBACK)
-    virtual bool needsAttachNotify() { return false; }
-#endif
 };
 
 } // namespace android

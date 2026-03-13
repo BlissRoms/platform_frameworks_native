@@ -47,7 +47,6 @@ public:
     virtual void onBufferReleased() override;
     virtual bool needsReleaseNotify() override;
     virtual void onBuffersDiscarded(const std::vector<int32_t>& slots) override;
-    virtual void onBufferDetached(int slot) override;
 };
 
 }  // namespace utils
